@@ -11,15 +11,38 @@ SuperAppDefinitions,
 StreamInDistributeOut
 } from "../superfluid/stream-in-distribute-out/StreamInDistributeOut.sol";
 
- import { ERC721URIStorage } from "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import {CFAv1Library} from "@superfluid-finance/ethereum-contracts/contracts/apps/CFAv1Library.sol";
+
+ import { ERC721URIStorage, ERC721} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
  import "@openzeppelin/contracts/utils/Counters.sol";
 
 contract SubscirbeOneCCPerSub is SuperAppBase, ERC721URIStorage {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
+    string constant private _name = "Subscriptions";
+    string constant private _symbol = "SUB";
 
-    mapping();
-    constructor() ERC721("Subscription","SUB") {}
+    using CFAv1Library for CFAv1Library.InitData;
+    CFAv1Library.InitData public cfaV1; //initialize cfaV1 variable
+
+    IConstantFlowAgreementV1 internal immutable _cfa;
+    ISuperfluid private _host;
+
+    constructor(ISuperfluid host) ERC721(_name, _symbol) 
+    {
+        _host = host;
+
+        //initialize InitData struct, and set equal to cfaV1        
+        cfaV1 = CFAv1Library.InitData(
+        host,
+        //here, we are deriving the address of the CFA using the host contract
+        IConstantFlowAgreementV1(
+            address(host.getAgreementClass(
+                    keccak256("org.superfluid-finance.agreements.ConstantFlowAgreement.v1")
+                ))
+            )
+        );
+    }
 
     function subscribe(address subscriber, string memory _tokenURI) private returns(uint256)
     {
@@ -40,9 +63,13 @@ contract SubscirbeOneCCPerSub is SuperAppBase, ERC721URIStorage {
         bytes calldata ctx) external override returns (bytes memory newCtx)  
         {
             (address sender, ) = abi.decode(agreementData, (address, address));
+            subscribe(sender, string(keccak256(sender)));
             (,int96 flowRate,,) = _cfa.getFlowByID(token, agreementId);
 
-            address receiver = "Content Creator"
+            ISuperfluid.Context memory decompiledContext = _host.decodeCtx(ctx);
+            //userData = abi.decode(decompiledContext.userData, (address));
+
+            address receiver = abi.decode(decompiledContext.userData, (address));
             cfaV1.createFlow(receiver, token, flowRate);
         }
 
