@@ -1,0 +1,3 @@
+[submodule "frontend/next-ethers"]
+	path = frontend/next-ethers
+	url = https://github.com/SoyElga/Pikabu.git
